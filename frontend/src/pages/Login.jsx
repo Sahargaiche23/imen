@@ -54,14 +54,14 @@ export default function Login() {
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-[#1e3a5f] via-[#2a4a72] to-[#1a3352]">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center px-16 text-white">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center px-16 py-12 text-white">
         <h1 className="text-5xl font-extrabold mb-4 leading-tight">
           Plainte<span className="text-orange-400">360</span>
         </h1>
-        <p className="text-xl text-blue-200 mb-8 leading-relaxed">
+        <p className="text-xl text-blue-200 mb-6 leading-relaxed">
           Plateforme intelligente de gestion des plaintes citoyennes
         </p>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[
             'Déposez vos plaintes via un chatbot intelligent',
             'Suivi en temps réel de vos réclamations',
@@ -69,37 +69,12 @@ export default function Login() {
             'Communication transparente avec votre commune',
           ].map((text, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+              <div className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></div>
               <p className="text-blue-100">{text}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 p-4 bg-white/10 rounded-xl backdrop-blur-sm">
-          <p className="text-sm text-blue-200 mb-2">Comptes de démonstration :</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="font-semibold text-orange-300">Citoyen</p>
-              <p>citoyen@plainte360.dz</p>
-              <p>citoyen123</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="font-semibold text-orange-300">Agent</p>
-              <p>agent@plainte360.dz</p>
-              <p>agent123</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="font-semibold text-orange-300">Secrétaire Général</p>
-              <p>sg@plainte360.dz</p>
-              <p>sg123</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="font-semibold text-orange-300">Admin</p>
-              <p>admin@plainte360.dz</p>
-              <p>admin123</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Right panel - form */}
