@@ -61,14 +61,53 @@ function isRTL(text) {
   return arabicChars > text.length * 0.3;
 }
 
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fr`);
+    const data = await res.json();
+    if (data && data.display_name) {
+      const addr = data.address || {};
+      const parts = [addr.road, addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village, addr.state].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : data.display_name;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function MiniMap({ coords }) {
+  if (!coords) return null;
+  return (
+    <div className="rounded-lg overflow-hidden border border-white/20 mb-2" style={{ height: 140, width: '100%' }}>
+      <MapContainer center={coords} zoom={15} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false} dragging={false} zoomControl={false} attributionControl={false}>
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <Marker position={coords} />
+      </MapContainer>
+    </div>
+  );
+}
+
 function LocationPicker({ onSelect, onClose, lang }) {
   const [position, setPosition] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [address, setAddress] = useState(null);
+  const [geocoding, setGeocoding] = useState(false);
+
+  const doReverseGeocode = async (lat, lng) => {
+    setGeocoding(true);
+    setAddress(null);
+    const addr = await reverseGeocode(lat, lng);
+    setAddress(addr || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    setGeocoding(false);
+  };
 
   function ClickHandler() {
     useMapEvents({
       click(e) {
-        setPosition([e.latlng.lat, e.latlng.lng]);
+        const p = [e.latlng.lat, e.latlng.lng];
+        setPosition(p);
+        doReverseGeocode(p[0], p[1]);
       },
     });
     return null;
@@ -78,7 +117,9 @@ function LocationPicker({ onSelect, onClose, lang }) {
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setPosition([pos.coords.latitude, pos.coords.longitude]);
+        const p = [pos.coords.latitude, pos.coords.longitude];
+        setPosition(p);
+        doReverseGeocode(p[0], p[1]);
         setGpsLoading(false);
       },
       () => {
@@ -117,9 +158,17 @@ function LocationPicker({ onSelect, onClose, lang }) {
         <div className="p-4 space-y-3">
           <p className="text-xs text-slate-500 text-center">{l.click}</p>
           {position && (
-            <p className="text-xs text-center text-green-600 font-medium">
-              📍 {position[0].toFixed(5)}, {position[1].toFixed(5)}
-            </p>
+            <div className="text-center">
+              <p className="text-xs text-green-600 font-medium">
+                📍 {position[0].toFixed(5)}, {position[1].toFixed(5)}
+              </p>
+              {geocoding && <p className="text-xs text-slate-400 mt-1 animate-pulse">🔍 ...</p>}
+              {address && !geocoding && (
+                <p className="text-xs text-slate-600 mt-1 font-medium bg-slate-50 px-2 py-1 rounded inline-block">
+                  🏠 {address}
+                </p>
+              )}
+            </div>
           )}
           <div className="flex gap-2">
             <button
@@ -130,7 +179,7 @@ function LocationPicker({ onSelect, onClose, lang }) {
               <MapPin size={14} /> {gpsLoading ? '...' : l.gps}
             </button>
             <button
-              onClick={() => position && onSelect(position)}
+              onClick={() => position && onSelect(position, address)}
               disabled={!position}
               className="flex-1 px-3 py-2.5 bg-gradient-to-r from-[#1e3a5f] to-[#2a4a72] text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-all"
             >
@@ -153,6 +202,7 @@ export default function CitizenChatbot() {
   const [loading, setLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const messagesEndRef = useRef(null);
@@ -185,16 +235,13 @@ export default function CitizenChatbot() {
     if (!userMsg || loading) return;
 
     setInput('');
-    const extras = [];
-    if (selectedCoords) extras.push(`📍 GPS: ${selectedCoords[0].toFixed(4)}, ${selectedCoords[1].toFixed(4)}`);
-    if (selectedPhoto) extras.push(`📷 ${selectedPhoto.name}`);
 
     setMessages((prev) => [...prev, {
       role: 'user',
       text: userMsg,
       photoPreview: photoPreview || null,
       coords: selectedCoords || null,
-      extras: extras.length > 0 ? extras : null,
+      address: selectedAddress || null,
     }]);
     setLoading(true);
 
@@ -203,6 +250,9 @@ export default function CitizenChatbot() {
       if (selectedCoords) {
         payload.latitude = selectedCoords[0];
         payload.longitude = selectedCoords[1];
+        if (selectedAddress) {
+          payload.address = selectedAddress;
+        }
       }
       if (photoPreview) {
         payload.photo_base64 = photoPreview;
@@ -228,6 +278,7 @@ export default function CitizenChatbot() {
     } finally {
       setLoading(false);
       setSelectedCoords(null);
+      setSelectedAddress(null);
       setSelectedPhoto(null);
       setPhotoPreview(null);
     }
@@ -248,6 +299,7 @@ export default function CitizenChatbot() {
       setMessages([{ role: 'bot', text: WELCOME[l] }]);
     }
     setSelectedCoords(null);
+    setSelectedAddress(null);
     setSelectedPhoto(null);
     setPhotoPreview(null);
   };
@@ -261,10 +313,11 @@ export default function CitizenChatbot() {
           <LocationPicker
             lang={lang}
             onClose={() => setShowMap(false)}
-            onSelect={(coords) => {
+            onSelect={(coords, addr) => {
               setSelectedCoords(coords);
+              setSelectedAddress(addr);
               setShowMap(false);
-              toast.success(lang === 'en' ? 'Location selected' : lang === 'ar' || lang === 'tn' ? 'تم اختيار الموقع' : 'Localisation sélectionnée');
+              toast.success(addr || (lang === 'en' ? 'Location selected' : lang === 'ar' || lang === 'tn' ? 'تم اختيار الموقع' : 'Localisation sélectionnée'));
             }}
           />
         )}
@@ -352,8 +405,12 @@ export default function CitizenChatbot() {
                       </div>
                     )}
                     {msg.coords && (
-                      <div className="mb-2 flex items-center gap-1 text-xs opacity-80">
-                        <MapPin size={12} /> {msg.coords[0].toFixed(4)}, {msg.coords[1].toFixed(4)}
+                      <div className="mb-2">
+                        <MiniMap coords={msg.coords} />
+                        <div className="flex items-center gap-1 text-xs opacity-80 mt-1">
+                          <MapPin size={12} />
+                          <span>{msg.address || `${msg.coords[0].toFixed(4)}, ${msg.coords[1].toFixed(4)}`}</span>
+                        </div>
                       </div>
                     )}
                     {msg.text.split('\n').map((line, i) => (
@@ -417,8 +474,8 @@ export default function CitizenChatbot() {
             <div className="flex items-center gap-3 max-w-4xl mx-auto flex-wrap">
               {selectedCoords && (
                 <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                  <MapPin size={12} /> {selectedCoords[0].toFixed(4)}, {selectedCoords[1].toFixed(4)}
-                  <button onClick={() => setSelectedCoords(null)} className="ml-1 hover:text-red-500"><X size={12} /></button>
+                  <MapPin size={12} /> {selectedAddress || `${selectedCoords[0].toFixed(4)}, ${selectedCoords[1].toFixed(4)}`}
+                  <button onClick={() => { setSelectedCoords(null); setSelectedAddress(null); }} className="ml-1 hover:text-red-500"><X size={12} /></button>
                 </span>
               )}
               {photoPreview && (

@@ -623,7 +623,11 @@ def chat_message(
 
     # ── LOCATION STATE ──
     elif step == "location":
-        conv["data"]["localisation"] = text
+        # Use reverse-geocoded address if available, otherwise user text
+        if msg.address:
+            conv["data"]["localisation"] = msg.address
+        else:
+            conv["data"]["localisation"] = text
         # Save GPS coords if sent with this message
         if msg.latitude and msg.longitude:
             conv["data"]["latitude"] = msg.latitude

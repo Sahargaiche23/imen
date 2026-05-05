@@ -119,6 +119,7 @@ class ChatMessage(BaseModel):
     plainte_id: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    address: Optional[str] = None
     photo_base64: Optional[str] = None
 
 
