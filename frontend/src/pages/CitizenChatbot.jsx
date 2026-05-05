@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api/axios';
@@ -97,11 +97,22 @@ function MiniMap({ coords }) {
   );
 }
 
+function FlyToPosition({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 16, { duration: 1.5 });
+    }
+  }, [position, map]);
+  return null;
+}
+
 function LocationPicker({ onSelect, onClose, lang }) {
   const [position, setPosition] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [address, setAddress] = useState(null);
   const [geocoding, setGeocoding] = useState(false);
+  const [flyTarget, setFlyTarget] = useState(null);
 
   const doReverseGeocode = async (lat, lng) => {
     setGeocoding(true);
@@ -128,14 +139,16 @@ function LocationPicker({ onSelect, onClose, lang }) {
       (pos) => {
         const p = [pos.coords.latitude, pos.coords.longitude];
         setPosition(p);
+        setFlyTarget(p);
         doReverseGeocode(p[0], p[1]);
         setGpsLoading(false);
       },
-      () => {
+      (err) => {
+        console.error('GPS error:', err);
         toast.error(lang === 'en' ? 'GPS access denied' : 'Accès GPS refusé');
         setGpsLoading(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -161,6 +174,7 @@ function LocationPicker({ onSelect, onClose, lang }) {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <ClickHandler />
+            <FlyToPosition position={flyTarget} />
             {position && <Marker position={position} />}
           </MapContainer>
         </div>
@@ -225,17 +239,43 @@ export default function CitizenChatbot() {
     scrollToBottom();
   }, [messages]);
 
-  const handlePhotoSelect = (e) => {
+  const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width;
+          let h = img.height;
+          if (w > maxWidth) {
+            h = (h * maxWidth) / w;
+            w = maxWidth;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error(lang === 'en' ? 'Photo too large (max 5MB)' : 'Photo trop volumineuse (max 5Mo)');
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(lang === 'en' ? 'Photo too large (max 20MB)' : 'Photo trop volumineuse (max 20Mo)');
       return;
     }
     setSelectedPhoto(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target.result);
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(file);
+    setPhotoPreview(compressed);
+    toast.success(lang === 'en' ? 'Photo ready' : 'Photo prête');
   };
 
   const sendMessage = async (e, overrideMsg) => {
