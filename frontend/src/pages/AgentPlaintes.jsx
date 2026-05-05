@@ -321,7 +321,12 @@ export default function AgentPlaintes() {
               {selectedPlainte.photo_url && (
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
                   <h4 className="text-xs font-semibold text-slate-400 uppercase mb-3">📷 Photo jointe</h4>
-                  <img src={selectedPlainte.photo_url} alt="Photo plainte" className="rounded-lg max-h-64 w-auto" />
+                  <img
+                    src={selectedPlainte.photo_url.startsWith('http') ? selectedPlainte.photo_url : `${import.meta.env.VITE_API_URL || ''}${selectedPlainte.photo_url}`}
+                    alt="Photo plainte"
+                    className="rounded-lg max-h-64 w-auto"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                 </div>
               )}
 
