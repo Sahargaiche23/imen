@@ -67,7 +67,16 @@ async function reverseGeocode(lat, lng) {
     const data = await res.json();
     if (data && data.display_name) {
       const addr = data.address || {};
-      const parts = [addr.road, addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village, addr.state].filter(Boolean);
+      const neighbourhood = addr.suburb || addr.neighbourhood || addr.quarter || '';
+      const city = addr.city || addr.town || addr.village || '';
+      const state = addr.state || '';
+      const road = addr.road || addr.pedestrian || '';
+      // Build address: neighbourhood first, then city, then state. Road only if short and doesn't reference other cities
+      const parts = [];
+      if (neighbourhood) parts.push(neighbourhood);
+      if (road && road.length < 40 && !road.toLowerCase().includes('nationale')) parts.push(road);
+      if (city && city !== neighbourhood) parts.push(city);
+      if (state && state !== city) parts.push(state);
       return parts.length > 0 ? parts.join(', ') : data.display_name;
     }
     return null;

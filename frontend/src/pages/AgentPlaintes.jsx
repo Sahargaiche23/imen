@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import api from '../api/axios';
 import Layout from '../components/Layout';
 import { StatusBadge, UrgenceBadge, CategorieLabel } from '../components/StatusBadge';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 import {
   FileText, MapPin, Clock, Send, ArrowLeft, AlertTriangle, User,
   Play, CheckCircle, ClipboardList, Wrench, MessageSquare, Brain,
@@ -279,6 +289,41 @@ export default function AgentPlaintes() {
                   </div>
                 </div>
               </div>
+
+              {/* GPS Map */}
+              {selectedPlainte.latitude && selectedPlainte.longitude && (
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                    <MapPin size={14} /> Localisation GPS
+                  </h4>
+                  <div className="rounded-lg overflow-hidden border border-slate-200" style={{ height: 250 }}>
+                    <MapContainer
+                      center={[selectedPlainte.latitude, selectedPlainte.longitude]}
+                      zoom={16}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={true}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[selectedPlainte.latitude, selectedPlainte.longitude]} />
+                    </MapContainer>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 text-center">
+                    📍 {selectedPlainte.latitude.toFixed(5)}, {selectedPlainte.longitude.toFixed(5)}
+                    {selectedPlainte.localisation && ` — ${selectedPlainte.localisation}`}
+                  </p>
+                </div>
+              )}
+
+              {/* Photo */}
+              {selectedPlainte.photo_url && (
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase mb-3">📷 Photo jointe</h4>
+                  <img src={selectedPlainte.photo_url} alt="Photo plainte" className="rounded-lg max-h-64 w-auto" />
+                </div>
+              )}
 
               {selectedPlainte.commentaire_sg && (
                 <div className="bg-orange-50 rounded-xl border border-orange-200 p-5">
