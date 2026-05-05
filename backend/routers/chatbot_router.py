@@ -701,16 +701,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def save_photo_base64(base64_data: str) -> str:
-    """Save base64 photo and return relative path"""
+    """Return the base64 data URL directly (Render has ephemeral FS)"""
     try:
-        if "," in base64_data:
-            base64_data = base64_data.split(",")[1]
-        img_data = base64.b64decode(base64_data)
-        filename = f"{uuid.uuid4().hex}.jpg"
-        filepath = os.path.join(UPLOAD_DIR, filename)
-        with open(filepath, "wb") as f:
-            f.write(img_data)
-        return f"/api/chatbot/uploads/{filename}"
+        # Keep the full data URL for direct display in <img> tags
+        if base64_data.startswith("data:"):
+            return base64_data
+        # If raw base64, wrap it
+        return f"data:image/jpeg;base64,{base64_data}"
     except Exception:
         return None
 

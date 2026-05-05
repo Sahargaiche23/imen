@@ -69,7 +69,7 @@ class Plainte(Base):
     localisation = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    photo_url = Column(String(500), nullable=True)
+    photo_url = Column(Text, nullable=True)
     resume_ia = Column(Text, nullable=True)
     reponse_agent = Column(Text, nullable=True)
     commentaire_sg = Column(Text, nullable=True)
