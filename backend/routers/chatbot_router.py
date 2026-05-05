@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user
 import models
 import schemas
 import re
+import os
+import uuid
+import base64
 
 router = APIRouter(prefix="/api/chatbot", tags=["Chatbot"])
 
@@ -620,6 +624,15 @@ def chat_message(
     # ── LOCATION STATE ──
     elif step == "location":
         conv["data"]["localisation"] = text
+        # Save GPS coords if sent with this message
+        if msg.latitude and msg.longitude:
+            conv["data"]["latitude"] = msg.latitude
+            conv["data"]["longitude"] = msg.longitude
+        # Save photo if sent
+        if msg.photo_base64:
+            photo_path = save_photo_base64(msg.photo_base64)
+            if photo_path:
+                conv["data"]["photo_url"] = photo_path
         conv["step"] = "urgency"
         return schemas.ChatResponse(
             reply=MSGS["ask_urgency"][lang],
@@ -643,6 +656,9 @@ def chat_message(
             categorie=categorie,
             urgence=urgence,
             localisation=localisation,
+            latitude=conv["data"].get("latitude"),
+            longitude=conv["data"].get("longitude"),
+            photo_url=conv["data"].get("photo_url"),
             statut="soumise",
             resume_ia=resume,
         )
@@ -673,6 +689,48 @@ def chat_message(
     # ── FALLBACK ──
     conversations[user_id] = {"step": "idle", "data": {}, "lang": lang}
     return schemas.ChatResponse(reply=GREETINGS[lang], plainte_created=False)
+
+
+# ─── PHOTO UPLOAD ───
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def save_photo_base64(base64_data: str) -> str:
+    """Save base64 photo and return relative path"""
+    try:
+        if "," in base64_data:
+            base64_data = base64_data.split(",")[1]
+        img_data = base64.b64decode(base64_data)
+        filename = f"{uuid.uuid4().hex}.jpg"
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(img_data)
+        return f"/api/chatbot/uploads/{filename}"
+    except Exception:
+        return None
+
+
+@router.post("/upload-photo")
+async def upload_photo(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+):
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+    return {"photo_url": f"/api/chatbot/uploads/{filename}"}
+
+
+@router.get("/uploads/{filename}")
+def serve_upload(filename: str):
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(filepath)
 
 
 @router.post("/reset")

@@ -57,6 +57,9 @@ class PlainteCreate(BaseModel):
     categorie: str = "autre"
     urgence: str = "moyenne"
     localisation: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_url: Optional[str] = None
 
 
 class PlainteUpdate(BaseModel):
@@ -80,6 +83,9 @@ class PlainteOut(BaseModel):
     urgence: str
     statut: str
     localisation: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_url: Optional[str] = None
     resume_ia: Optional[str] = None
     reponse_agent: Optional[str] = None
     commentaire_sg: Optional[str] = None
@@ -111,6 +117,9 @@ class HistoriqueOut(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     plainte_id: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_base64: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

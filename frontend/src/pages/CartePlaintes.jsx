@@ -34,13 +34,17 @@ const URGENCE_ICONS = {
   }),
 };
 
-// Simulated geocoding: distribute complaints across Algiers area
+// Simulated geocoding: distribute complaints across Tunis area
 const LOCATION_COORDS = {
-  default: [36.7538, 3.0588],
+  default: [36.8065, 10.1815],
 };
 
-function getCoords(localisation, index) {
-  // Distribute points around Algiers center with slight randomization
+function getCoords(localisation, index, plainte) {
+  // Use real GPS coords if available
+  if (plainte && plainte.latitude && plainte.longitude) {
+    return [plainte.latitude, plainte.longitude];
+  }
+  // Distribute points around Tunis center with slight randomization
   const base = LOCATION_COORDS.default;
   const angle = (index * 137.5) * (Math.PI / 180); // golden angle
   const radius = 0.005 + (index * 0.003);
@@ -166,7 +170,7 @@ export default function CartePlaintes() {
             </div>
           ) : (
             <MapContainer
-              center={[36.7538, 3.0588]}
+              center={[36.8065, 10.1815]}
               zoom={13}
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom={true}
@@ -176,7 +180,7 @@ export default function CartePlaintes() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               {filtered.map((p, i) => {
-                const coords = getCoords(p.localisation, i);
+                const coords = getCoords(p.localisation, i, p);
                 const icon = URGENCE_ICONS[p.urgence] || URGENCE_ICONS.moyenne;
                 return (
                   <Marker key={p.id} position={coords} icon={icon}>

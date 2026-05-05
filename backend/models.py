@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum, Float
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -67,6 +67,9 @@ class Plainte(Base):
     urgence = Column(String(20), default=UrgenceEnum.moyenne)
     statut = Column(String(50), default=StatutEnum.soumise)
     localisation = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    photo_url = Column(String(500), nullable=True)
     resume_ia = Column(Text, nullable=True)
     reponse_agent = Column(Text, nullable=True)
     commentaire_sg = Column(Text, nullable=True)

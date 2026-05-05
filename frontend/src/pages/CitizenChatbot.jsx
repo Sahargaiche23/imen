@@ -1,8 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import api from '../api/axios';
 import Layout from '../components/Layout';
-import { Send, Bot, User, RotateCcw, Globe, Zap, HelpCircle, ListChecks, BarChart3 } from 'lucide-react';
+import { Send, Bot, User, RotateCcw, Globe, MapPin, Camera, X, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+const TUNIS_CENTER = [36.8065, 10.1815];
 
 const LANG_FLAGS = { fr: '🇫🇷', en: '🇬🇧', ar: '🇹🇳', tn: '🇹🇳' };
 const LANG_NAMES = { fr: 'Français', en: 'English', ar: 'العربية', tn: 'تونسي' };
@@ -49,6 +61,88 @@ function isRTL(text) {
   return arabicChars > text.length * 0.3;
 }
 
+function LocationPicker({ onSelect, onClose, lang }) {
+  const [position, setPosition] = useState(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  function ClickHandler() {
+    useMapEvents({
+      click(e) {
+        setPosition([e.latlng.lat, e.latlng.lng]);
+      },
+    });
+    return null;
+  }
+
+  const useMyGPS = () => {
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition([pos.coords.latitude, pos.coords.longitude]);
+        setGpsLoading(false);
+      },
+      () => {
+        toast.error(lang === 'en' ? 'GPS access denied' : 'Accès GPS refusé');
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const labels = {
+    fr: { title: 'Choisir la localisation', gps: 'Ma position GPS', confirm: 'Confirmer', click: 'Cliquez sur la carte ou utilisez le GPS' },
+    en: { title: 'Choose location', gps: 'My GPS location', confirm: 'Confirm', click: 'Click on the map or use GPS' },
+    ar: { title: 'اختر الموقع', gps: 'موقعي GPS', confirm: 'تأكيد', click: 'انقر على الخريطة أو استخدم GPS' },
+    tn: { title: 'اختار البلاصة', gps: 'بلاصتي GPS', confirm: 'أكّد', click: 'أنقر على الخريطة ولا استعمل GPS' },
+  };
+  const l = labels[lang] || labels.fr;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-[#1e3a5f] to-[#2a4a72]">
+          <h3 className="text-white font-semibold flex items-center gap-2"><MapPin size={18} /> {l.title}</h3>
+          <button onClick={onClose} className="text-white/80 hover:text-white"><X size={20} /></button>
+        </div>
+        <div style={{ height: 350 }}>
+          <MapContainer center={TUNIS_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <ClickHandler />
+            {position && <Marker position={position} />}
+          </MapContainer>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-slate-500 text-center">{l.click}</p>
+          {position && (
+            <p className="text-xs text-center text-green-600 font-medium">
+              📍 {position[0].toFixed(5)}, {position[1].toFixed(5)}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={useMyGPS}
+              disabled={gpsLoading}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm transition-colors"
+            >
+              <MapPin size={14} /> {gpsLoading ? '...' : l.gps}
+            </button>
+            <button
+              onClick={() => position && onSelect(position)}
+              disabled={!position}
+              className="flex-1 px-3 py-2.5 bg-gradient-to-r from-[#1e3a5f] to-[#2a4a72] text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-all"
+            >
+              {l.confirm}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CitizenChatbot() {
   const [lang, setLang] = useState('fr');
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -57,7 +151,12 @@ export default function CitizenChatbot() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [selectedCoords, setSelectedCoords] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -67,17 +166,49 @@ export default function CitizenChatbot() {
     scrollToBottom();
   }, [messages]);
 
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(lang === 'en' ? 'Photo too large (max 5MB)' : 'Photo trop volumineuse (max 5Mo)');
+      return;
+    }
+    setSelectedPhoto(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
   const sendMessage = async (e, overrideMsg) => {
     if (e) e.preventDefault();
     const userMsg = (overrideMsg || input).trim();
     if (!userMsg || loading) return;
 
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
+    const extras = [];
+    if (selectedCoords) extras.push(`📍 GPS: ${selectedCoords[0].toFixed(4)}, ${selectedCoords[1].toFixed(4)}`);
+    if (selectedPhoto) extras.push(`📷 ${selectedPhoto.name}`);
+
+    setMessages((prev) => [...prev, {
+      role: 'user',
+      text: userMsg,
+      photoPreview: photoPreview || null,
+      coords: selectedCoords || null,
+      extras: extras.length > 0 ? extras : null,
+    }]);
     setLoading(true);
 
     try {
-      const res = await api.post('/chatbot/message', { message: userMsg });
+      const payload = { message: userMsg };
+      if (selectedCoords) {
+        payload.latitude = selectedCoords[0];
+        payload.longitude = selectedCoords[1];
+      }
+      if (photoPreview) {
+        payload.photo_base64 = photoPreview;
+      }
+
+      const res = await api.post('/chatbot/message', payload);
       setMessages((prev) => [
         ...prev,
         { role: 'bot', text: res.data.reply, plainte_id: res.data.plainte_id, plainte_created: res.data.plainte_created },
@@ -96,6 +227,9 @@ export default function CitizenChatbot() {
       setMessages((prev) => [...prev, { role: 'bot', text: errMsgs[lang] }]);
     } finally {
       setLoading(false);
+      setSelectedCoords(null);
+      setSelectedPhoto(null);
+      setPhotoPreview(null);
     }
   };
 
@@ -113,6 +247,9 @@ export default function CitizenChatbot() {
     } catch {
       setMessages([{ role: 'bot', text: WELCOME[l] }]);
     }
+    setSelectedCoords(null);
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
   };
 
   const quickActions = QUICK_ACTIONS[lang];
@@ -120,6 +257,18 @@ export default function CitizenChatbot() {
   return (
     <Layout>
       <div className="flex flex-col h-screen">
+        {showMap && (
+          <LocationPicker
+            lang={lang}
+            onClose={() => setShowMap(false)}
+            onSelect={(coords) => {
+              setSelectedCoords(coords);
+              setShowMap(false);
+              toast.success(lang === 'en' ? 'Location selected' : lang === 'ar' || lang === 'tn' ? 'تم اختيار الموقع' : 'Localisation sélectionnée');
+            }}
+          />
+        )}
+
         {/* Header */}
         <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -137,7 +286,6 @@ export default function CitizenChatbot() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Language selector */}
             <div className="relative">
               <button
                 onClick={() => setShowLangMenu(!showLangMenu)}
@@ -198,6 +346,16 @@ export default function CitizenChatbot() {
                         : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-sm'
                     }`}
                   >
+                    {msg.photoPreview && (
+                      <div className="mb-2">
+                        <img src={msg.photoPreview} alt="Photo" className="rounded-lg max-h-40 w-auto" />
+                      </div>
+                    )}
+                    {msg.coords && (
+                      <div className="mb-2 flex items-center gap-1 text-xs opacity-80">
+                        <MapPin size={12} /> {msg.coords[0].toFixed(4)}, {msg.coords[1].toFixed(4)}
+                      </div>
+                    )}
                     {msg.text.split('\n').map((line, i) => (
                       <p key={i} className={i > 0 ? 'mt-1.5' : ''}>
                         {line.split('**').map((part, j) =>
@@ -253,9 +411,46 @@ export default function CitizenChatbot() {
           </div>
         )}
 
+        {/* Attachments preview */}
+        {(selectedCoords || photoPreview) && (
+          <div className="bg-amber-50 border-t border-amber-200 px-4 py-2">
+            <div className="flex items-center gap-3 max-w-4xl mx-auto flex-wrap">
+              {selectedCoords && (
+                <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                  <MapPin size={12} /> {selectedCoords[0].toFixed(4)}, {selectedCoords[1].toFixed(4)}
+                  <button onClick={() => setSelectedCoords(null)} className="ml-1 hover:text-red-500"><X size={12} /></button>
+                </span>
+              )}
+              {photoPreview && (
+                <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                  <Image size={12} /> {selectedPhoto?.name}
+                  <button onClick={() => { setSelectedPhoto(null); setPhotoPreview(null); }} className="ml-1 hover:text-red-500"><X size={12} /></button>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Input */}
         <form onSubmit={sendMessage} className="bg-white border-t border-slate-200 p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto">
+            <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-xl transition-all"
+              title={lang === 'en' ? 'Attach photo' : 'Joindre une photo'}
+            >
+              <Camera size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMap(true)}
+              className="p-3 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+              title={lang === 'en' ? 'Pick location' : 'Choisir la localisation'}
+            >
+              <MapPin size={20} />
+            </button>
             <input
               type="text"
               value={input}

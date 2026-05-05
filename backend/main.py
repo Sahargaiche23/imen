@@ -40,27 +40,27 @@ def seed_data():
             users = [
                 User(
                     nom="Admin", prenom="Système",
-                    email="admin@plainte360.dz",
+                    email="admin@plainte360.tn",
                     password_hash=get_password_hash("admin123"),
                     role="administrateur"
                 ),
                 User(
                     nom="Benmoussa", prenom="Karim",
-                    email="agent@plainte360.dz",
+                    email="agent@plainte360.tn",
                     password_hash=get_password_hash("agent123"),
                     role="agent",
                     telephone="0555123456"
                 ),
                 User(
                     nom="Khelifi", prenom="Samira",
-                    email="sg@plainte360.dz",
+                    email="sg@plainte360.tn",
                     password_hash=get_password_hash("sg123"),
                     role="secretaire_general",
                     telephone="0555654321"
                 ),
                 User(
                     nom="Ben Salem", prenom="Ahmed",
-                    email="citoyen@plainte360.dz",
+                    email="citoyen@plainte360.tn",
                     password_hash=get_password_hash("citoyen123"),
                     role="citoyen",
                     telephone="0555111222",
