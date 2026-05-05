@@ -34,8 +34,30 @@ app.include_router(notifications_router.router)
 
 @app.on_event("startup")
 def seed_data():
+    # Migrate: add new columns if missing (latitude, longitude, photo_url)
+    from sqlalchemy import inspect as sa_inspect, text
+    insp = sa_inspect(engine)
+    if "plaintes" in insp.get_table_names():
+        cols = [c["name"] for c in insp.get_columns("plaintes")]
+        with engine.connect() as conn:
+            if "latitude" not in cols:
+                conn.execute(text("ALTER TABLE plaintes ADD COLUMN latitude FLOAT"))
+            if "longitude" not in cols:
+                conn.execute(text("ALTER TABLE plaintes ADD COLUMN longitude FLOAT"))
+            if "photo_url" not in cols:
+                conn.execute(text("ALTER TABLE plaintes ADD COLUMN photo_url VARCHAR(500)"))
+            conn.commit()
+
     db = SessionLocal()
     try:
+        # Migrate .dz emails to .tn
+        old_users = db.query(User).filter(User.email.like("%@plainte360.dz")).all()
+        for u in old_users:
+            u.email = u.email.replace("@plainte360.dz", "@plainte360.tn")
+        if old_users:
+            db.commit()
+            print("✅ Emails migrés de .dz vers .tn")
+
         if db.query(User).count() == 0:
             users = [
                 User(
